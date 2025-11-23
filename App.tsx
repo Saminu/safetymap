@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import SafetyMap from './components/SafetyMap';
 import Legend from './components/Legend';
 import AddReportModal from './components/AddReportModal';
 import AIChatPanel from './components/AIChatPanel';
+import TimeSlider from './components/TimeSlider';
 import { MapReport, Coordinates, ZoneType } from './types';
 import { scanForThreats } from './services/geminiService';
 
@@ -53,9 +54,36 @@ function App() {
   const [tempMarkerPos, setTempMarkerPos] = useState<Coordinates | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
-  // Calculate stats
-  const totalAbducted = reports.reduce((sum, r) => sum + (r.abductedCount || 0), 0);
-  const criticalZones = reports.filter(r => r.severity === 'critical' || r.severity === 'high').length;
+  // Time Slider State
+  // Default lookback: 14 days or derived from data
+  const [sliderRange, setSliderRange] = useState<[number, number]>([
+     Date.now() - (14 * 24 * 60 * 60 * 1000), 
+     Date.now()
+  ]);
+
+  // Compute boundaries for the slider based on data history
+  const { minTime, maxTime } = useMemo(() => {
+    const now = Date.now();
+    if (reports.length === 0) {
+      return { minTime: now - (30 * 24 * 60 * 60 * 1000), maxTime: now };
+    }
+    const timestamps = reports.map(r => r.timestamp);
+    const oldest = Math.min(...timestamps);
+    // Ensure we have at least a 30 day window or slightly older than oldest report
+    return {
+      minTime: Math.min(oldest, now - (30 * 24 * 60 * 60 * 1000)),
+      maxTime: now
+    };
+  }, [reports]);
+
+  // Filter reports based on slider selection
+  const filteredReports = useMemo(() => {
+    return reports.filter(r => r.timestamp >= sliderRange[0] && r.timestamp <= sliderRange[1]);
+  }, [reports, sliderRange]);
+
+  // Calculate stats based on FILTERED view
+  const totalAbducted = filteredReports.reduce((sum, r) => sum + (r.abductedCount || 0), 0);
+  const criticalZones = filteredReports.filter(r => r.severity === 'critical' || r.severity === 'high').length;
 
   const handleMapClick = (coords: Coordinates) => {
     setTempMarkerPos(coords);
@@ -92,7 +120,7 @@ function App() {
         description: inc.description || 'Automated threat detection.',
         position: inc.position!,
         radius: inc.radius || 2000,
-        timestamp: inc.timestamp || Date.now(), // Use the parsed timestamp from Gemini
+        timestamp: inc.timestamp || Date.now(),
         severity: inc.severity || 'high',
         abductedCount: inc.abductedCount || 0,
         dataConfidence: inc.dataConfidence || 'Medium',
@@ -119,7 +147,7 @@ function App() {
   }, [handleScanThreats]);
 
   return (
-    <div className="relative h-screen w-screen flex flex-col bg-neutral-900 font-sans">
+    <div className="relative h-screen w-screen flex flex-col bg-neutral-900 font-sans overflow-hidden">
       {/* Header Bar */}
       <header className="absolute top-0 left-0 right-0 z-[1000] bg-neutral-900/80 backdrop-blur-md border-b border-neutral-700 h-16 flex items-center justify-between px-6 shadow-xl">
         <div className="flex items-center gap-3">
@@ -147,7 +175,7 @@ function App() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Scanning Network...
+                  Scanning...
                 </>
              ) : (
                 <>
@@ -183,7 +211,7 @@ function App() {
       <div className="absolute top-20 left-6 z-[900] pointer-events-none">
         <div className="bg-neutral-900/90 backdrop-blur border border-neutral-700 p-4 rounded-lg shadow-2xl inline-flex gap-6 pointer-events-auto">
             <div>
-                <div className="text-[10px] text-neutral-500 font-mono uppercase">Total Abducted (Est.)</div>
+                <div className="text-[10px] text-neutral-500 font-mono uppercase">Total Abducted (Visible)</div>
                 <div className="text-2xl font-bold text-white flex items-baseline gap-1">
                     {totalAbducted}
                     <span className="text-xs font-normal text-neutral-400">souls</span>
@@ -194,26 +222,30 @@ function App() {
                 <div className="text-[10px] text-neutral-500 font-mono uppercase">Active Threats</div>
                 <div className="text-2xl font-bold text-red-500">{criticalZones}</div>
             </div>
-            <div className="w-px bg-neutral-700"></div>
-             <div>
-                <div className="text-[10px] text-neutral-500 font-mono uppercase">Data Integrity</div>
-                <div className="text-2xl font-bold text-blue-400">84%</div>
-            </div>
         </div>
       </div>
 
       {/* Map Container */}
       <div className="flex-1 relative">
          <SafetyMap 
-            reports={reports} 
+            reports={filteredReports} 
             isAddingMode={isAddingMode}
             onMapClick={handleMapClick}
          />
       </div>
 
+      {/* Timeline Controls */}
+      <TimeSlider 
+        minTime={minTime}
+        maxTime={maxTime}
+        initialMin={sliderRange[0]}
+        initialMax={sliderRange[1]}
+        onChange={(min, max) => setSliderRange([min, max])}
+      />
+
       {/* Overlays */}
       <Legend />
-      <AIChatPanel reports={reports} />
+      <AIChatPanel reports={filteredReports} />
 
       {/* Modals */}
       {tempMarkerPos && (
