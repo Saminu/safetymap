@@ -1,0 +1,7 @@
+{
+  "name": "SafetyMap Africa",
+  "description": "A collaborative surveillance and safety mapping platform for Africa, focusing on Nigeria. Annotate events, safe zones, and potential threats.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
