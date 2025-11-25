@@ -30,30 +30,32 @@
         background: #1a1a1a;
       }
       
-      /* Map Marker Animations */
-      @keyframes pulse-ring {
-        0% { transform: scale(1); opacity: 0.8; }
-        50% { transform: scale(1.05); opacity: 1; stroke-width: 3px; }
-        100% { transform: scale(1); opacity: 0.8; }
+      /* Popup Customization */
+      .leaflet-popup-content-wrapper {
+        background: rgba(23, 23, 23, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid #404040;
+        border-radius: 0.5rem;
+        color: #e5e5e5;
       }
-      
-      .marker-recent {
-        animation: pulse-ring 2.5s infinite ease-in-out;
-        transform-origin: center;
-      }
-      
-      .marker-old {
-        filter: grayscale(0.7) opacity(0.6);
+      .leaflet-popup-tip {
+        background: rgba(23, 23, 23, 0.95);
+        border: 1px solid #404040;
       }
     </style>
   <script type="importmap">
 {
   "imports": {
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "react-leaflet": "https://aistudiocdn.com/react-leaflet@^5.0.0"
+    "leaflet": "https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.esm.js",
+    "react-leaflet": "https://aistudiocdn.com/react-leaflet@^5.0.0",
+    "firebase/app": "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/"
   }
 }
 </script>

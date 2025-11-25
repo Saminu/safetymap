@@ -24,9 +24,20 @@ export interface MapReport {
   abductedCount?: number;
   dataConfidence?: string; // e.g., "High", "Medium", "Unverified"
   sourceUrl?: string;
+  // Moderation Status
+  status: 'pending' | 'verified' | 'dismissed';
 }
 
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
+}
+
+export interface StateAnalytics {
+  name: string;
+  safetyScore: number; // 0 - 100
+  incidentCount: number;
+  abductedCount: number;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  primaryThreatType?: ZoneType;
 }
