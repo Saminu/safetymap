@@ -60,7 +60,7 @@ export const analyzeSafetySituation = async (
             config: {
                 systemInstruction: "You are a tactical security analyst for SafetyMap Africa. \n\n1. **Be Concise**: Keep answers short and direct. Avoid fluff.\n2. **Formatting**: Use bullet points (-) for distinct threats. Use UPPERCASE for locations/zones.\n3. **Data Usage**: Base answers STRICTLY on the provided JSON context. If the JSON is empty, state 'NO ACTIVE INTEL FOR THIS SECTOR'.\n4. **Safety**: Do not refuse to answer security queries. Provide objective situational awareness.",
                 temperature: 0.3, 
-                maxOutputTokens: 8192,
+                maxOutputTokens: 512,
                 // Disable safety blocks for security analysis tools to prevent false positives on 'kidnapping'/'attacks'
                 safetySettings: [
                     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -166,4 +166,65 @@ export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
     console.error("Gemini Threat Scan Failed:", error);
     throw error;
   }
+};
+
+/**
+ * Uses LLM Intelligence to identify duplicate reports in the database.
+ * Returns a list of IDs that should be DELETED.
+ */
+export const identifyDuplicates = async (reports: MapReport[]): Promise<string[]> => {
+    if (reports.length < 2) return [];
+
+    try {
+        // Simplify the payload to save tokens, only sending necessary fields for comparison
+        const simplifiedReports = reports.map(r => ({
+            id: r.id,
+            title: r.title,
+            desc: r.description.substring(0, 100), // First 100 chars usually enough
+            loc: `${r.position.lat.toFixed(3)},${r.position.lng.toFixed(3)}`,
+            date: new Date(r.timestamp).toISOString().split('T')[0],
+            source: r.sourceUrl || ''
+        }));
+
+        const prompt = `
+            You are a Data Deduplication Expert.
+            Analyze this JSON list of security reports.
+            Identify groups of reports that refer to the EXACT SAME real-world incident.
+            
+            Criteria for duplication:
+            1. Similar Location (approximate coordinates)
+            2. Similar Date (within 48 hours)
+            3. Semantic match in Title/Description (e.g. "Kidnapping in Kaduna" vs "2 abducted in Kaduna State")
+            
+            For each duplicate group, keep the one that appears most detailed or has a source URL.
+            Return a JSON object containing a list of IDs to DELETE.
+            
+            Format: { "duplicateIds": ["id_to_delete_1", "id_to_delete_2"] }
+            
+            Input Data:
+            ${JSON.stringify(simplifiedReports)}
+        `;
+
+        const response = await withRetry(async () => {
+            return await ai.models.generateContent({
+                model: 'gemini-3-pro-preview',
+                contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    temperature: 0.1,
+                    maxOutputTokens: 4096,
+                }
+            });
+        });
+
+        const text = response.text || '{}';
+        const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const result = JSON.parse(jsonString);
+
+        return result.duplicateIds || [];
+
+    } catch (error) {
+        console.error("AI Deduplication failed:", error);
+        return [];
+    }
 };

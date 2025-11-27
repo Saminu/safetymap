@@ -25,7 +25,7 @@ export interface MapReport {
   dataConfidence?: string; // e.g., "High", "Medium", "Unverified"
   sourceUrl?: string;
   // Moderation Status
-  status: 'pending' | 'verified' | 'dismissed';
+  status: 'pending' | 'verified' | 'dismissed' | 'resolved';
 }
 
 export interface ChatMessage {

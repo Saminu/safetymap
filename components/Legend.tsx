@@ -30,7 +30,7 @@ const Legend: React.FC = () => {
     return (
       <button 
         onClick={() => setIsExpanded(true)}
-        className="absolute bottom-24 right-4 z-[1000] bg-neutral-900/90 backdrop-blur border border-neutral-700 p-2.5 rounded-lg shadow-xl text-neutral-400 hover:text-white transition-all group"
+        className="absolute bottom-28 sm:bottom-24 right-4 z-[1000] bg-neutral-900/90 backdrop-blur border border-neutral-700 p-2.5 rounded-lg shadow-xl text-neutral-400 hover:text-white transition-all group"
         title="Show Legend"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -45,7 +45,7 @@ const Legend: React.FC = () => {
 
   // Expanded View
   return (
-    <div className="absolute bottom-24 right-4 z-[1000] bg-neutral-900/95 backdrop-blur-md border border-neutral-700 p-4 rounded-lg shadow-2xl text-xs w-60 font-sans animate-fade-in-up">
+    <div className="absolute bottom-28 sm:bottom-24 right-4 z-[1000] bg-neutral-900/95 backdrop-blur-md border border-neutral-700 p-4 rounded-lg shadow-2xl text-xs w-60 font-sans animate-fade-in-up">
       <div className="flex justify-between items-center mb-3 pb-2 border-b border-neutral-700">
         <h3 className="font-bold text-neutral-300 uppercase tracking-wider">
             Signal Legend

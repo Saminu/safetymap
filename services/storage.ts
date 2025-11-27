@@ -1,4 +1,3 @@
-
 import { initializeApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -13,9 +12,11 @@ import {
   limit,
   where,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { MapReport, ZoneType } from '../types';
+import { identifyDuplicates } from './geminiService';
 
 // --- CONFIGURATION ---
 const FIREBASE_CONFIG = {
@@ -42,19 +43,6 @@ try {
 
 // Initial Data for Seeding
 const INITIAL_REPORTS: MapReport[] = [
-  {
-    id: '1',
-    type: ZoneType.EVENT_GATHERING,
-    title: 'Tech Conference Lagos',
-    description: 'Large gathering expected at Landmark Centre. High traffic volume.',
-    position: { lat: 6.4281, lng: 3.4219 },
-    radius: 800,
-    timestamp: Date.now(),
-    severity: 'low',
-    abductedCount: 0,
-    dataConfidence: 'High',
-    status: 'verified'
-  },
   {
     id: '2',
     type: ZoneType.SUSPECTED_KIDNAPPING,
@@ -115,7 +103,12 @@ const isDuplicateReport = (newReport: MapReport, existingReports: MapReport[]) =
             return true;
         }
 
-        // Check 2: Spatiotemporal Match
+        // Check 2: Exact Title & Description Match (Semantic Dedupe fallback)
+        if (newReport.title === existing.title && newReport.description === existing.description) {
+            return true;
+        }
+
+        // Check 3: Spatiotemporal Match
         // If same Type, within 5km, and within 48 hours
         if (newReport.type === existing.type) {
             const distKm = getDistanceFromLatLonInKm(
@@ -268,12 +261,10 @@ export const storageService = {
     window.dispatchEvent(new Event('storage'));
   },
 
-  updateReportStatus: async (id: string, status: 'verified' | 'dismissed') => {
+  updateReportStatus: async (id: string, status: 'verified' | 'dismissed' | 'resolved') => {
     if (db) {
       try {
         if (status === 'dismissed') {
-            // Option to delete or mark as dismissed. Deleting keeps DB clean.
-            // Using delete for now as per "disapprove" workflow usually implies rejection.
             await deleteDoc(doc(db, "reports", id));
         } else {
             await updateDoc(doc(db, "reports", id), { status });
@@ -348,6 +339,38 @@ export const storageService = {
         localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(updated));
         localStorage.setItem(STORAGE_KEYS.LAST_UPDATED, Date.now().toString());
         window.dispatchEvent(new Event('storage'));
+    }
+  },
+
+  runSmartDeduplication: async (): Promise<number> => {
+    if (!db) return 0;
+
+    try {
+        // Fetch ALL reports (assume manageable size for prototype, < 1000)
+        // For production, this would need pagination or server-side functions
+        const q = query(collection(db, "reports"));
+        const snapshot = await getDocs(q);
+        const allReports = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as MapReport));
+
+        if (allReports.length < 2) return 0;
+
+        // Use LLM to find duplicates
+        const idsToDelete = await identifyDuplicates(allReports);
+
+        if (idsToDelete.length > 0) {
+            console.log(`AI identified ${idsToDelete.length} duplicates to remove.`);
+            const batch = writeBatch(db);
+            idsToDelete.forEach(id => {
+                const ref = doc(db, "reports", id);
+                batch.delete(ref);
+            });
+            await batch.commit();
+        }
+
+        return idsToDelete.length;
+    } catch (e) {
+        console.error("Smart Deduplication failed:", e);
+        return 0;
     }
   },
 

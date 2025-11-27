@@ -1,4 +1,7 @@
-# SafetyMap World 🌍🛡️
+
+# SafetyMap Africa 🌍🛡️
+
+![SafetyMap Interface](screenshot.png)
 
 **A collaborative surveillance and safety mapping platform, currently focusing on Nigeria, then Africa and the World.**
 
@@ -46,8 +49,8 @@ To run this project locally, follow these steps:
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/yourusername/safetymap-africa.git
-    cd safetymap-africa
+    git clone https://github.com/Saminu/safetymap.git
+    cd safetymap
     ```
 
 2.  **Install Dependencies**

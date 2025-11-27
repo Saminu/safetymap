@@ -48,7 +48,7 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ reports }) => {
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="absolute bottom-8 left-4 z-[1000] bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-full shadow-lg shadow-blue-900/50 transition-all flex items-center gap-2 pr-5 group"
+        className="absolute bottom-6 sm:bottom-8 left-4 z-[1000] bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-full shadow-lg shadow-blue-900/50 transition-all flex items-center gap-2 pr-5 group"
       >
         <div className="relative">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -62,7 +62,7 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ reports }) => {
   }
 
   return (
-    <div className="absolute bottom-4 left-4 right-4 sm:right-auto sm:bottom-8 z-[1000] sm:w-96 bg-neutral-900/95 backdrop-blur-xl border border-neutral-700 rounded-lg shadow-2xl flex flex-col overflow-hidden h-[60vh] sm:h-[500px] transition-all">
+    <div className="absolute bottom-4 left-4 right-4 sm:right-auto sm:bottom-8 z-[1000] sm:w-96 bg-neutral-900/95 backdrop-blur-xl border border-neutral-700 rounded-lg shadow-2xl flex flex-col overflow-hidden h-[60vh] sm:h-[500px] transition-all animate-slide-up">
       {/* Header */}
       <div className="bg-neutral-800 p-3 flex justify-between items-center border-b border-neutral-700 shrink-0">
         <div className="flex items-center gap-2">

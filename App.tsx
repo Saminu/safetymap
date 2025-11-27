@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import SafetyMap from './components/SafetyMap';
+import SafetyMap, { MapStyle } from './components/SafetyMap';
 import Legend from './components/Legend';
 import AddReportModal from './components/AddReportModal';
 import AdminModal from './components/AdminModal';
@@ -8,6 +8,7 @@ import AIChatPanel from './components/AIChatPanel';
 import TimeSlider from './components/TimeSlider';
 import VerificationPanel from './components/VerificationPanel';
 import SafetyDashboard from './components/SafetyDashboard';
+import RecentIntelPanel from './components/RecentIntelPanel';
 import { MapReport, Coordinates, ZoneType } from './types';
 import { scanForThreats } from './services/geminiService';
 import { storageService } from './services/storage';
@@ -26,7 +27,9 @@ function App() {
   const [currentView, setCurrentView] = useState<'map' | 'dashboard'>('map');
   const [isAddingMode, setIsAddingMode] = useState(false);
   const [tempMarkerPos, setTempMarkerPos] = useState<Coordinates | null>(null);
+  const [mapFocusPosition, setMapFocusPosition] = useState<Coordinates | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [mapStyle, setMapStyle] = useState<MapStyle>('dark');
   
   // Mobile UI States
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -153,6 +156,34 @@ function App() {
       await storageService.updateReportStatus(id, 'dismissed');
       setToast({ msg: "Report Dismissed", type: 'info' });
   };
+  
+  const handleAdminMapAction = async (id: string, action: 'resolve' | 'delete') => {
+      if (action === 'delete') {
+          await storageService.updateReportStatus(id, 'dismissed');
+          setToast({ msg: "Report Permanently Deleted", type: 'info' });
+      } else {
+          await storageService.updateReportStatus(id, 'resolved');
+          setToast({ msg: "Report Marked as Resolved (Expired)", type: 'success' });
+      }
+  };
+
+  const cycleMapStyle = () => {
+    setMapStyle(prev => {
+        if (prev === 'dark') return 'light';
+        if (prev === 'light') return 'satellite';
+        return 'dark';
+    });
+  };
+
+  // Automated Threat Scan (Interval)
+  useEffect(() => {
+    const scanInterval = setInterval(() => {
+      if (isAdmin && !isScanning) {
+        handleScanThreats();
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+    return () => clearInterval(scanInterval);
+  }, [isAdmin, isScanning, handleScanThreats]);
 
   return (
     <div className="relative h-screen w-screen flex flex-col bg-neutral-900 font-sans overflow-hidden">
@@ -167,7 +198,7 @@ function App() {
                 </svg>
             </div>
             <div className="flex flex-col justify-center">
-                <h1 className="text-sm sm:text-xl font-bold text-white tracking-tight leading-none">SAFETY<span className="hidden xs:inline">MAP</span> <span className="text-blue-500">AFRICA</span></h1>
+                <h1 className="text-xs sm:text-xl font-bold text-white tracking-tight leading-none">SAFETYMAP <span className="text-blue-500">AFRICA</span></h1>
                 <div className="text-[9px] text-neutral-400 font-mono hidden sm:block">
                     GRID: NIGERIA <span className="mx-1">•</span> LIVE
                 </div>
@@ -177,6 +208,33 @@ function App() {
         {/* Action Center */}
         <div className="flex items-center gap-2 sm:gap-3">
             
+            {/* Map Style Switcher */}
+            {currentView === 'map' && (
+                <button
+                    onClick={cycleMapStyle}
+                    className="p-1.5 sm:p-2 rounded hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors border border-transparent hover:border-neutral-700"
+                    title={`Current Map: ${mapStyle.toUpperCase()}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                </button>
+            )}
+
+             {/* GitHub Link */}
+             <a 
+                href="https://github.com/Saminu/safetymap" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-2 py-1.5 sm:px-3 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white transition-colors border border-neutral-700 hover:border-neutral-500"
+                title="Contribute on GitHub"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                <span className="hidden lg:inline text-xs font-bold uppercase tracking-wide">Contribute</span>
+            </a>
+
             {/* View Toggle */}
             <div className="flex bg-neutral-800 rounded p-0.5 sm:p-1 border border-neutral-700">
                 <button
@@ -256,13 +314,18 @@ function App() {
                     setIsAddingMode(!isAddingMode);
                     setTempMarkerPos(null);
                 }}
-                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap ${
                     isAddingMode 
                     ? 'bg-neutral-700 text-white'
                     : 'bg-red-600 text-white shadow-red-900/20'
                 }`}
             >
-                {isAddingMode ? 'CANCEL' : '+ ADD'}
+                {isAddingMode ? 'CANCEL' : (
+                    <>
+                        <span className="sm:hidden">+ REPORT</span>
+                        <span className="hidden sm:inline">+ REPORT INCIDENCE</span>
+                    </>
+                )}
             </button>
 
             {/* Auth Button (Icon Only on Mobile) */}
@@ -292,23 +355,44 @@ function App() {
         </div>
       )}
 
-      {/* Map Stats Overlay (Desktop Only) */}
+      {/* Stats Overlay (Desktop Floating / Mobile Top Bar) */}
       {currentView === 'map' && (
-        <div className="absolute top-20 left-6 z-[900] pointer-events-none hidden lg:block">
-            <div className="bg-neutral-900/90 backdrop-blur border border-neutral-700 p-3 rounded-lg shadow-xl inline-flex gap-5 pointer-events-auto">
-                <div>
-                    <div className="text-[9px] text-neutral-500 font-mono uppercase">Verified Abductions</div>
-                    <div className="text-xl font-bold text-white leading-none mt-1">
-                        {totalAbducted}
+        <>
+            {/* Desktop View (Floating) */}
+            <div className="absolute top-20 left-72 z-[900] pointer-events-none hidden lg:block">
+                <div className="bg-neutral-900/90 backdrop-blur border border-neutral-700 p-3 rounded-lg shadow-xl inline-flex gap-5 pointer-events-auto">
+                    <div>
+                        <div className="text-[9px] text-neutral-500 font-mono uppercase">Suspected Abductions</div>
+                        <div className="text-xl font-bold text-white leading-none mt-1">
+                            {totalAbducted}
+                        </div>
+                    </div>
+                    <div className="w-px bg-neutral-700"></div>
+                    <div>
+                        <div className="text-[9px] text-neutral-500 font-mono uppercase">Active Zones</div>
+                        <div className="text-xl font-bold text-red-500 leading-none mt-1">{criticalZones}</div>
                     </div>
                 </div>
-                <div className="w-px bg-neutral-700"></div>
-                <div>
-                    <div className="text-[9px] text-neutral-500 font-mono uppercase">Active Zones</div>
-                    <div className="text-xl font-bold text-red-500 leading-none mt-1">{criticalZones}</div>
-                </div>
             </div>
-        </div>
+
+            {/* Mobile View (Top Bar) */}
+            <div className="absolute top-14 sm:top-16 left-0 right-0 z-[800] bg-neutral-900/90 backdrop-blur border-b border-neutral-800 p-2 flex justify-around items-center lg:hidden shadow-lg">
+                 <div className="flex flex-col items-center">
+                    <div className="text-[8px] text-neutral-500 font-mono uppercase tracking-wider">Abducted</div>
+                    <div className="text-sm font-bold text-white leading-none mt-0.5">{totalAbducted}</div>
+                 </div>
+                 <div className="w-px h-6 bg-neutral-700"></div>
+                 <div className="flex flex-col items-center">
+                    <div className="text-[8px] text-neutral-500 font-mono uppercase tracking-wider">Active Zones</div>
+                    <div className="text-sm font-bold text-red-500 leading-none mt-0.5">{criticalZones}</div>
+                 </div>
+                 <div className="w-px h-6 bg-neutral-700"></div>
+                 <div className="flex flex-col items-center">
+                    <div className="text-[8px] text-neutral-500 font-mono uppercase tracking-wider">Last Update</div>
+                    <div className="text-sm font-bold text-blue-400 leading-none mt-0.5">{new Date(lastUpdated).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                 </div>
+            </div>
+        </>
       )}
 
       {/* Main Content */}
@@ -319,9 +403,19 @@ function App() {
                 <SafetyMap 
                     reports={filteredMapReports} 
                     isAddingMode={isAddingMode}
+                    mapStyle={mapStyle}
+                    focusPosition={mapFocusPosition}
                     onMapClick={handleMapClick}
+                    isAdmin={isAdmin}
+                    onAdminAction={handleAdminMapAction}
                 />
             </div>
+            
+            {/* Live Intel Feed */}
+            <RecentIntelPanel 
+                reports={verifiedReports}
+                onLocate={(coords) => setMapFocusPosition(coords)}
+            />
 
             <TimeSlider 
                 minTime={minTime}
@@ -344,7 +438,7 @@ function App() {
 
       {/* Toast Notification */}
       {toast && (
-          <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-[2000] px-4 py-2 rounded-lg shadow-2xl border font-bold text-xs tracking-wide animate-fade-in-down whitespace-nowrap ${
+          <div className={`absolute top-24 left-1/2 -translate-x-1/2 z-[2000] px-4 py-2 rounded-lg shadow-2xl border font-bold text-xs tracking-wide animate-fade-in-down whitespace-nowrap ${
               toast.type === 'success' ? 'bg-green-900/90 border-green-500 text-green-100' : 'bg-blue-900/90 border-blue-500 text-blue-100'
           }`}>
               {toast.msg}
@@ -370,7 +464,7 @@ function App() {
       )}
 
       {isAddingMode && !tempMarkerPos && currentView === 'map' && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] bg-amber-500 text-black px-4 py-1.5 rounded-full font-bold shadow-xl text-xs animate-bounce whitespace-nowrap">
+        <div className="absolute top-28 sm:top-24 left-1/2 -translate-x-1/2 z-[1000] bg-amber-500 text-black px-4 py-1.5 rounded-full font-bold shadow-xl text-xs animate-bounce whitespace-nowrap">
             TAP LOCATION TO MARK
         </div>
       )}
