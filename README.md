@@ -11,19 +11,21 @@ SafetyMap is a surveillance grid that combines community reporting with AI autom
 
 It is built to serve the public good, helping travelers, residents, and analysts stay informed about safety risks in real-time.
 
-## Key Features
+## Key Intelligence Capabilities
 
-### 🔹 The Safety Agent (AI Powered)
-An automated intelligence agent autonomously scours the web for recent news reports on abductions, attacks, and insurgency. Utilizing **Google Gemini (Gemini 3 Pro)** with search grounding, it curates, verifies, and geolocates incidents before adding them to the database.
+### 🔹 Autonomous Reconnaissance
+*   **Automated Web Patrol**: The system utilizes **Firecrawl** to autonomously scrape real-time data from news outlets, blogs, and social media, scanning for threat vectors like "bandits", "kidnapping", and "Boko Haram".
+*   **Unstructured Data Parsing**: Google Gemini (Gemini 3 Pro) digests raw news text to extract structured intelligence, including specific threat types, casualty estimates, and timestamps.
 
-### 🔹 Interactive Intelligence
-Users can interact directly with the Safety Agent via a chat interface. You can ask specific questions like *"Is the Abuja-Kaduna road safe today?"* or *"Summarize recent activity in Niger State"* to get tactical, data-driven advice.
+### 🔹 AI-Powered Analysis
+*   **Geospatial Estimation**: The AI agent analyzes location context within text (Towns, LGAs, Landmarks) to pinpoint precise Latitude/Longitude coordinates for the map grid.
+*   **Media Extraction**: The system automatically hunts for **Video Evidence** (YouTube, X.com) and **Image Intelligence** embedded in reports to provide visual corroboration for incidents.
+*   **Semantic Deduplication**: Intelligent agents compare the narrative context of incoming reports against the database to identify and merge duplicate events, keeping the intelligence grid clean.
 
-### 🔹 Public Reporting (OSINT)
-The platform empowers the community to contribute. Verified users can report incidents, effectively crowdsourcing Open Source Intelligence (OSINT) to fill the gaps left by traditional news coverage.
-
-### 🔹 Live Safety Index
-A real-time dashboard aggregates data to provide a **Safety Score (0-100)** for each state, helping users visualize high-risk zones and safety trends at a glance.
+### 🔹 Tactical Support & Verification
+*   **Interactive Safety Agent**: A context-aware Chat Bot that answers specific route safety queries (e.g., *"Is the Abuja-Kaduna road safe?"*) based on the live data grid.
+*   **Hybrid Verification**: Combines AI confidence scoring with **Crowdsourced Intelligence** (OSINT), allowing the community to vote on the accuracy of reports (Confirm/Fake/Recovered).
+*   **Live Safety Index**: Real-time algorithmic scoring (0-100) of state safety levels based on the density and severity of active threats.
 
 ---
 
@@ -33,6 +35,7 @@ A real-time dashboard aggregates data to provide a **Safety Score (0-100)** for 
 *   **Styling**: Tailwind CSS
 *   **Mapping**: Leaflet, React-Leaflet, CartoDB Dark Matter Tiles
 *   **AI & Logic**: Google Gemini API (`gemini-3-pro-preview`)
+*   **Data Scraper**: Firecrawl API
 *   **Database**: Firebase Firestore (Real-time updates) with LocalStorage fallback for offline capability.
 
 ---

@@ -355,46 +355,6 @@ function App() {
         </div>
       )}
 
-      {/* Stats Overlay (Desktop Floating / Mobile Top Bar) */}
-      {currentView === 'map' && (
-        <>
-            {/* Desktop View (Floating) */}
-            <div className="absolute top-20 left-72 z-[900] pointer-events-none hidden lg:block">
-                <div className="bg-neutral-900/90 backdrop-blur border border-neutral-700 p-3 rounded-lg shadow-xl inline-flex gap-5 pointer-events-auto">
-                    <div>
-                        <div className="text-[9px] text-neutral-500 font-mono uppercase">Suspected Abductions</div>
-                        <div className="text-xl font-bold text-white leading-none mt-1">
-                            {totalAbducted}
-                        </div>
-                    </div>
-                    <div className="w-px bg-neutral-700"></div>
-                    <div>
-                        <div className="text-[9px] text-neutral-500 font-mono uppercase">Active Zones</div>
-                        <div className="text-xl font-bold text-red-500 leading-none mt-1">{criticalZones}</div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Mobile View (Top Bar) */}
-            <div className="absolute top-14 sm:top-16 left-0 right-0 z-[800] bg-neutral-900/90 backdrop-blur border-b border-neutral-800 p-2 flex justify-around items-center lg:hidden shadow-lg">
-                 <div className="flex flex-col items-center">
-                    <div className="text-[8px] text-neutral-500 font-mono uppercase tracking-wider">Abducted</div>
-                    <div className="text-sm font-bold text-white leading-none mt-0.5">{totalAbducted}</div>
-                 </div>
-                 <div className="w-px h-6 bg-neutral-700"></div>
-                 <div className="flex flex-col items-center">
-                    <div className="text-[8px] text-neutral-500 font-mono uppercase tracking-wider">Active Zones</div>
-                    <div className="text-sm font-bold text-red-500 leading-none mt-0.5">{criticalZones}</div>
-                 </div>
-                 <div className="w-px h-6 bg-neutral-700"></div>
-                 <div className="flex flex-col items-center">
-                    <div className="text-[8px] text-neutral-500 font-mono uppercase tracking-wider">Last Update</div>
-                    <div className="text-sm font-bold text-blue-400 leading-none mt-0.5">{new Date(lastUpdated).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                 </div>
-            </div>
-        </>
-      )}
-
       {/* Main Content */}
       <div className="flex-1 relative bg-neutral-900 mt-14 sm:mt-16">
         {currentView === 'map' ? (
@@ -416,6 +376,21 @@ function App() {
                 reports={verifiedReports}
                 onLocate={(coords) => setMapFocusPosition(coords)}
             />
+
+             {/* Stats Overlay - Restored */}
+             <div className="absolute top-16 sm:top-24 right-14 sm:right-16 z-[800] pointer-events-none">
+                <div className="bg-neutral-900/90 backdrop-blur border border-neutral-700 p-2 sm:p-3 rounded-lg shadow-xl pointer-events-auto flex items-center gap-3 sm:gap-4">
+                    <div>
+                        <div className="text-[8px] sm:text-[9px] text-neutral-500 font-bold uppercase tracking-wider">Suspected Abductions</div>
+                        <div className="text-lg sm:text-2xl font-black text-white leading-none mt-1">{totalAbducted}</div>
+                    </div>
+                    <div className="w-px h-6 sm:h-8 bg-neutral-700"></div>
+                    <div>
+                        <div className="text-[8px] sm:text-[9px] text-neutral-500 font-bold uppercase tracking-wider">Active Zones</div>
+                        <div className="text-lg sm:text-2xl font-black text-red-500 leading-none mt-1">{criticalZones}</div>
+                    </div>
+                </div>
+            </div>
 
             <TimeSlider 
                 minTime={minTime}

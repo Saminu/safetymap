@@ -24,8 +24,20 @@ export interface MapReport {
   abductedCount?: number;
   dataConfidence?: string; // e.g., "High", "Medium", "Unverified"
   sourceUrl?: string;
+  videoUrl?: string; // URL to video evidence (YouTube, Twitter, etc.)
+  imageUrl?: string; // URL to image evidence
+  mediaUrls?: string[]; // Array of media URLs for gallery view
+  // Social Stats
+  viewCount?: number;
+  commentCount?: number;
   // Moderation Status
   status: 'pending' | 'verified' | 'dismissed' | 'resolved';
+  // Community Voting
+  voteCounts?: {
+    confirm: number;
+    recovered: number;
+    fake: number;
+  };
 }
 
 export interface ChatMessage {

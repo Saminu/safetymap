@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MapReport, Coordinates, ZoneType } from '../types';
-import { getZoneColor } from './Legend';
+import IncidentCard from './IncidentCard';
 
 interface RecentIntelPanelProps {
   reports: MapReport[];
@@ -12,91 +12,83 @@ const RecentIntelPanel: React.FC<RecentIntelPanelProps> = ({ reports, onLocate }
   const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
-    // Auto-collapse on mobile screens to save space
     if (window.innerWidth < 768) {
         setIsExpanded(false);
     }
   }, []);
 
-  // Filter for security threats, sort by newest, and visually deduplicate
-  const recentReports = [...reports]
+  // Filter and Sort Reports
+  const filteredReports = [...reports]
     .filter(r => r.type !== ZoneType.EVENT_GATHERING)
     .sort((a, b) => b.timestamp - a.timestamp)
-    // Filter out duplicates based on title and description
+    // Simple deduplication
     .filter((report, index, self) => 
         index === self.findIndex((t) => (
             t.title === report.title && 
             t.description === report.description
         ))
     )
-    .slice(0, 5);
+    .slice(0, 20);
 
-  if (recentReports.length === 0) return null;
+  if (reports.length === 0) return null;
 
-  const formatTime = (ts: number) => {
-    const date = new Date(ts);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  if (!isExpanded) {
+      return (
+          <button 
+            onClick={() => setIsExpanded(true)}
+            className="absolute top-28 sm:top-20 left-4 z-[900] bg-neutral-900 border border-neutral-700 text-white px-4 py-2 rounded-lg shadow-xl text-xs font-bold uppercase flex items-center gap-2"
+          >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              Live Intel Feed
+          </button>
+      );
+  }
 
   return (
-    <div className="absolute top-28 sm:top-20 left-4 z-[900] w-64 flex flex-col items-start font-sans transition-all duration-300">
-      <button 
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 bg-neutral-900/90 backdrop-blur border border-neutral-700 px-3 py-2 rounded-t-lg shadow-lg hover:bg-neutral-800 transition-colors"
-      >
-        <div className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+    <div className="absolute top-28 sm:top-20 left-4 z-[900] w-full max-w-sm sm:w-[400px] flex flex-col font-sans transition-all duration-300 max-h-[85vh]">
+      
+      {/* Header */}
+      <div className="flex items-center justify-between bg-neutral-900/95 border border-neutral-700/50 rounded-t-xl px-4 py-3 shadow-2xl backdrop-blur-md">
+        <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+            </span>
+            <span className="text-sm font-bold text-gray-100 tracking-wide uppercase">
+                Live Feed <span className="text-neutral-500 ml-1">({filteredReports.length})</span>
+            </span>
         </div>
-        <span className="text-xs font-bold text-white tracking-wider uppercase">Live Intel Feed</span>
-        <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className={`h-4 w-4 text-neutral-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
-            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        <button 
+            onClick={() => setIsExpanded(false)}
+            className="text-neutral-500 hover:text-white transition-colors"
         >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+      </div>
 
-      {isExpanded && (
-        <div className="w-full bg-neutral-900/90 backdrop-blur border border-neutral-700 border-t-0 rounded-b-lg rounded-tr-lg shadow-xl overflow-hidden animate-slide-down">
-            <div className="max-h-[40vh] overflow-y-auto custom-scrollbar">
-                {recentReports.map(report => (
-                    <div 
-                        key={report.id}
-                        onClick={() => onLocate(report.position)}
-                        className="p-3 border-b border-neutral-800 hover:bg-neutral-800 cursor-pointer group transition-colors relative"
-                    >
-                        <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: getZoneColor(report.type) }}></div>
-                        
-                        <div className="pl-2">
-                            <div className="flex justify-between items-start mb-1">
-                                <h4 className="text-xs font-bold text-gray-200 leading-tight group-hover:text-blue-400 transition-colors">
-                                    {report.title}
-                                </h4>
-                                <span className="text-[10px] text-neutral-500 font-mono whitespace-nowrap ml-2">
-                                    {formatTime(report.timestamp)}
-                                </span>
-                            </div>
-                            <p className="text-[10px] text-neutral-400 line-clamp-2 leading-relaxed">
-                                {report.description}
-                            </p>
-                            {report.abductedCount ? (
-                                <div className="mt-1.5 flex items-center">
-                                    <span className="text-[9px] bg-red-900/20 text-red-400 px-1.5 py-0.5 rounded uppercase font-bold border border-red-900/30">
-                                        {report.abductedCount} Abducted
-                                    </span>
-                                </div>
-                            ) : null}
-                        </div>
-                    </div>
-                ))}
-            </div>
-            <div className="bg-neutral-900 p-1.5 text-center border-t border-neutral-800">
-                <span className="text-[9px] text-neutral-600 uppercase tracking-widest">Real-time Grid Updates</span>
-            </div>
-        </div>
-      )}
+      {/* Feed List */}
+      <div className="bg-neutral-950/30 backdrop-blur-sm border border-neutral-700/50 border-t-0 rounded-b-xl overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="overflow-y-auto custom-scrollbar p-3 flex-1 scroll-smooth">
+            {filteredReports.map(report => (
+                <IncidentCard 
+                    key={report.id}
+                    report={report}
+                    onClick={() => onLocate(report.position)}
+                />
+            ))}
+          </div>
+          
+          <div className="bg-neutral-900/90 p-2 text-center border-t border-neutral-800 shrink-0">
+               <span className="text-[10px] text-neutral-500 font-mono uppercase tracking-widest">
+                  End of Live Stream
+               </span>
+          </div>
+      </div>
     </div>
   );
 };

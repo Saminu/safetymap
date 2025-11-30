@@ -6,7 +6,7 @@ import { getZoneLabel } from './Legend';
 interface AddReportModalProps {
   position: Coordinates;
   onClose: () => void;
-  onAdd: (data: { title: string; description: string; type: ZoneType; radius: number; abductedCount?: number; sourceUrl?: string }) => void;
+  onAdd: (data: { title: string; description: string; type: ZoneType; radius: number; abductedCount?: number; sourceUrl?: string; videoUrl?: string; imageUrl?: string }) => void;
 }
 
 const AddReportModal: React.FC<AddReportModalProps> = ({ position, onClose, onAdd }) => {
@@ -16,6 +16,8 @@ const AddReportModal: React.FC<AddReportModalProps> = ({ position, onClose, onAd
   const [radius, setRadius] = useState(500);
   const [abductedCount, setAbductedCount] = useState<string>('');
   const [sourceUrl, setSourceUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +27,9 @@ const AddReportModal: React.FC<AddReportModalProps> = ({ position, onClose, onAd
         type, 
         radius, 
         abductedCount: abductedCount ? parseInt(abductedCount) : undefined,
-        sourceUrl: sourceUrl || undefined
+        sourceUrl: sourceUrl || undefined,
+        videoUrl: videoUrl || undefined,
+        imageUrl: imageUrl || undefined
     });
   };
 
@@ -90,14 +94,37 @@ const AddReportModal: React.FC<AddReportModalProps> = ({ position, onClose, onAd
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-400 mb-1">Source URL</label>
+                <input 
+                  type="url" 
+                  value={sourceUrl}
+                  onChange={(e) => setSourceUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full bg-neutral-800 border border-neutral-700 text-white rounded p-2 focus:border-blue-500 outline-none text-sm placeholder-neutral-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-400 mb-1">Video Evidence</label>
+                <input 
+                  type="url" 
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="YouTube/X URL"
+                  className="w-full bg-neutral-800 border border-neutral-700 text-white rounded p-2 focus:border-blue-500 outline-none text-sm placeholder-neutral-600"
+                />
+              </div>
+          </div>
+
           <div>
-            <label className="block text-xs font-semibold text-neutral-400 mb-1">Source URL (Optional)</label>
+            <label className="block text-xs font-semibold text-neutral-400 mb-1">Image Evidence</label>
             <input 
-              type="url" 
-              value={sourceUrl}
-              onChange={(e) => setSourceUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full bg-neutral-800 border border-neutral-700 text-white rounded p-2 focus:border-blue-500 outline-none text-sm placeholder-neutral-600"
+                type="url" 
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="Image URL (jpg/png)"
+                className="w-full bg-neutral-800 border border-neutral-700 text-white rounded p-2 focus:border-blue-500 outline-none text-sm placeholder-neutral-600"
             />
           </div>
 

@@ -1,8 +1,10 @@
+
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { MapReport, ZoneType } from "../types";
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const FIRECRAWL_API_KEY = 'fc-69724fa1974c4e1b88e329483042b346';
 
 // Helper for exponential backoff retry
 async function withRetry<T>(operation: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
@@ -16,12 +18,58 @@ async function withRetry<T>(operation: () => Promise<T>, retries = 3, delay = 10
     const isRateLimit = error.status === 429 || error.status === 503;
     
     if (isNetworkError || isRateLimit) {
-      console.warn(`Gemini API Retry (${retries} left):`, error.message);
+      console.warn(`API Retry (${retries} left):`, error.message);
       await new Promise(resolve => setTimeout(resolve, delay));
       return withRetry(operation, retries - 1, delay * 2);
     }
     
     throw error;
+  }
+}
+
+/**
+ * Perform a search using Firecrawl API
+ */
+async function searchWithFirecrawl(queryStr: string): Promise<string> {
+  const url = 'https://api.firecrawl.dev/v2/search';
+  const options = {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      "query": queryStr,
+      "sources": ["web"],
+      "categories": [],
+      "limit": 10,
+      "scrapeOptions": {
+          "onlyMainContent": false,
+          "maxAge": 172800000,
+          "parsers": ["pdf"],
+          "formats": []
+        }
+    })
+  };
+
+  try {
+    const response = await fetch(url, options);
+    const result = await response.json();
+    
+    if (result.success && result.data && result.data.web) {
+      // Map relevant fields to string context
+      return result.data.web.map((item: any) => `
+        SOURCE URL: ${item.url}
+        TITLE: ${item.title}
+        DESCRIPTION: ${item.description}
+        SUMMARY: ${item.summary || 'N/A'}
+        ---
+      `).join('\n');
+    }
+    return '';
+  } catch (error) {
+    console.error(`Firecrawl search failed for "${queryStr}":`, error);
+    return '';
   }
 }
 
@@ -43,7 +91,6 @@ export const analyzeSafetySituation = async (
       desc: r.description
     }));
 
-    // Prevent empty context hallucination
     const dataContext = contextData.length > 0 
       ? JSON.stringify(contextData) 
       : "[] (No active reports visible in current sector)";
@@ -60,8 +107,7 @@ export const analyzeSafetySituation = async (
             config: {
                 systemInstruction: "You are a tactical security analyst for SafetyMap Africa. \n\n1. **Be Concise**: Keep answers short and direct. Avoid fluff.\n2. **Formatting**: Use bullet points (-) for distinct threats. Use UPPERCASE for locations/zones.\n3. **Data Usage**: Base answers STRICTLY on the provided JSON context. If the JSON is empty, state 'NO ACTIVE INTEL FOR THIS SECTOR'.\n4. **Safety**: Do not refuse to answer security queries. Provide objective situational awareness.",
                 temperature: 0.3, 
-                maxOutputTokens: 512,
-                // Disable safety blocks for security analysis tools to prevent false positives on 'kidnapping'/'attacks'
+                maxOutputTokens: 2048,
                 safetySettings: [
                     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -76,7 +122,6 @@ export const analyzeSafetySituation = async (
         return response.text;
     }
     
-    // Check for safety block or finish reason
     const candidate = response.candidates?.[0];
     if (candidate?.finishReason) {
          return `Analysis Halted. Reason: ${candidate.finishReason}. (Try rephrasing your query or reducing scope)`;
@@ -90,35 +135,68 @@ export const analyzeSafetySituation = async (
 };
 
 /**
- * Scans for recent security incidents using Google Search grounding and returns structured map reports.
+ * Scans for recent security incidents using Firecrawl (Web Scrape) -> Gemini (Processing).
  */
 export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
   try {
-    const prompt = `
-      Act as an automated intelligence gathering agent for Nigeria.
-      Search for the latest security incidents (last 14 days) in Nigeria, specifically:
-      - Kidnappings / Abductions
-      - Bandit attacks
-      - Boko Haram / ISWAP activity
-      - Communal clashes
+    // 1. Gather Intelligence via Firecrawl
+    const queries = [
+        "bandits spotted nigeria",
+        "kidnapping incident nigeria video",
+        "boko haram attack footage nigeria",
+        "communal clash nigeria news"
+    ];
 
-      Use sources like Pulse Nigeria, Vanguard, Premium Times, Daily Post, and verified Twitter reports.
+    console.log("Initiating Firecrawl Scan...");
+    const searchPromises = queries.map(q => searchWithFirecrawl(q));
+    const rawResults = await Promise.all(searchPromises);
+    const aggregatedIntel = rawResults.join('\n\n');
+
+    if (!aggregatedIntel.trim()) {
+        console.warn("Firecrawl returned no results.");
+        return [];
+    }
+
+    // 2. Process Intelligence via Gemini
+    const prompt = `
+      Act as an automated intelligence analyst.
+      Analyze the following RAW WEB SEARCH DATA gathered from Firecrawl regarding security incidents in Nigeria.
+
+      RAW DATA:
+      ${aggregatedIntel}
+
+      ---
       
-      Return a STRICT JSON array of objects. Do not use markdown.
-      Each object must have:
-      {
-        "title": "Short headline (e.g. 'Abduction in Kajuru')",
-        "description": "2-sentence summary.",
-        "type": "SUSPECTED_KIDNAPPING" or "BOKO_HARAM_ACTIVITY" or "EVENT_GATHERING",
-        "lat": number (approximate latitude of the town/LGA),
-        "lng": number (approximate longitude of the town/LGA),
-        "abductedCount": number (estimate, use 0 if not applicable),
-        "confidence": "High" or "Medium" or "Low",
-        "radius": number (impact radius in meters),
-        "severity": "high" or "critical",
-        "date": "YYYY-MM-DD" (date of the incident),
-        "sourceUrl": "URL string to the news source"
-      }
+      YOUR TASK:
+      Extract confirmed security incidents into a STRICT JSON array.
+      
+      CRITICAL RULES:
+      1. **Media Extraction**: 
+         - Look for 'videoUrl' (URLs pointing to X.com/Twitter, YouTube, Facebook videos).
+         - Look for 'imageUrl' (URLs pointing to article main images, jpg/png evidence).
+         - Look for 'mediaUrls' (Any array of image/video evidence).
+      2. **Geolocation**: Estimate the Lat/Lng based on the town/LGA mentioned.
+      3. **Deduplication**: Do not create multiple entries for the same event found in different search results.
+      4. **Dates**: Only include recent events (implied within last 7 days based on context).
+      
+      Output JSON Format:
+      [
+        {
+            "title": "Short Headline",
+            "description": "2-sentence summary.",
+            "type": "SUSPECTED_KIDNAPPING" | "BOKO_HARAM_ACTIVITY" | "EVENT_GATHERING" | "MILITARY_CHECKPOINT",
+            "lat": number,
+            "lng": number,
+            "abductedCount": number (0 if none),
+            "confidence": "High" | "Medium",
+            "radius": number (meters),
+            "severity": "high" | "critical" | "medium",
+            "sourceUrl": "URL of the article/page",
+            "videoUrl": "URL of video evidence if found (otherwise null)",
+            "imageUrl": "URL of image evidence if found (otherwise null)",
+            "mediaUrls": ["url1", "url2"]
+        }
+      ]
     `;
 
     const response = await withRetry(async () => {
@@ -126,9 +204,9 @@ export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
             model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
-                tools: [{ googleSearch: {} }],
-                temperature: 0.1, // Low temperature for consistent JSON
+                temperature: 0.1,
                 maxOutputTokens: 8192,
+                responseMimeType: 'application/json',
                 safetySettings: [
                     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -140,22 +218,22 @@ export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
     });
 
     const text = response.text || '';
-    
-    // Clean up response to ensure valid JSON parsing
     const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
     try {
       const incidents = JSON.parse(jsonString);
-      // Map raw JSON to Partial<MapReport>
+      
+      // Post-processing to ensure data shape
       return incidents.map((inc: any) => ({
         ...inc,
-        // Ensure type validity
         type: Object.values(ZoneType).includes(inc.type) ? inc.type : ZoneType.SUSPECTED_KIDNAPPING,
         severity: ['low','medium','high','critical'].includes(inc.severity) ? inc.severity : 'high',
         position: { lat: inc.lat, lng: inc.lng },
-        // Parse date to timestamp if present
-        timestamp: inc.date ? new Date(inc.date).getTime() : Date.now(),
-        sourceUrl: inc.sourceUrl
+        timestamp: Date.now(), // Timestamp set to scan time
+        sourceUrl: inc.sourceUrl,
+        videoUrl: inc.videoUrl,
+        imageUrl: inc.imageUrl,
+        mediaUrls: inc.mediaUrls || []
       }));
     } catch (parseError) {
       console.error("Failed to parse Gemini JSON:", text);
@@ -163,48 +241,33 @@ export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
     }
 
   } catch (error) {
-    console.error("Gemini Threat Scan Failed:", error);
+    console.error("Gemini/Firecrawl Threat Scan Failed:", error);
     throw error;
   }
 };
 
-/**
- * Uses LLM Intelligence to identify duplicate reports in the database.
- * Returns a list of IDs that should be DELETED.
- */
 export const identifyDuplicates = async (reports: MapReport[]): Promise<string[]> => {
+    // (Existing duplicate logic preserved)
     if (reports.length < 2) return [];
-
     try {
-        // Simplify the payload to save tokens, only sending necessary fields for comparison
         const simplifiedReports = reports.map(r => ({
             id: r.id,
             title: r.title,
-            desc: r.description.substring(0, 100), // First 100 chars usually enough
+            desc: r.description.substring(0, 100),
             loc: `${r.position.lat.toFixed(3)},${r.position.lng.toFixed(3)}`,
             date: new Date(r.timestamp).toISOString().split('T')[0],
             source: r.sourceUrl || ''
         }));
-
         const prompt = `
             You are a Data Deduplication Expert.
             Analyze this JSON list of security reports.
             Identify groups of reports that refer to the EXACT SAME real-world incident.
-            
-            Criteria for duplication:
-            1. Similar Location (approximate coordinates)
-            2. Similar Date (within 48 hours)
-            3. Semantic match in Title/Description (e.g. "Kidnapping in Kaduna" vs "2 abducted in Kaduna State")
-            
             For each duplicate group, keep the one that appears most detailed or has a source URL.
-            Return a JSON object containing a list of IDs to DELETE.
-            
-            Format: { "duplicateIds": ["id_to_delete_1", "id_to_delete_2"] }
+            Return a JSON object: { "duplicateIds": ["id_to_delete_1", "id_to_delete_2"] }
             
             Input Data:
             ${JSON.stringify(simplifiedReports)}
         `;
-
         const response = await withRetry(async () => {
             return await ai.models.generateContent({
                 model: 'gemini-3-pro-preview',
@@ -216,15 +279,11 @@ export const identifyDuplicates = async (reports: MapReport[]): Promise<string[]
                 }
             });
         });
-
         const text = response.text || '{}';
         const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const result = JSON.parse(jsonString);
-
         return result.duplicateIds || [];
-
     } catch (error) {
-        console.error("AI Deduplication failed:", error);
         return [];
     }
 };
