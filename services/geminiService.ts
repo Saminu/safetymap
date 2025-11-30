@@ -41,13 +41,11 @@ async function searchWithFirecrawl(queryStr: string): Promise<string> {
     body: JSON.stringify({
       "query": queryStr,
       "sources": ["web"],
-      "categories": [],
-      "limit": 10,
+      "limit": 5, // Fetch top 5 results per query to save tokens/time
       "scrapeOptions": {
-          "onlyMainContent": false,
-          "maxAge": 172800000,
-          "parsers": ["pdf"],
-          "formats": []
+          "onlyMainContent": true,
+          "maxAge": 172800000, // 48 hours
+          "formats": ["markdown"]
         }
     })
   };
@@ -62,7 +60,7 @@ async function searchWithFirecrawl(queryStr: string): Promise<string> {
         SOURCE URL: ${item.url}
         TITLE: ${item.title}
         DESCRIPTION: ${item.description}
-        SUMMARY: ${item.summary || 'N/A'}
+        CONTENT (MARKDOWN): ${item.markdown ? item.markdown.substring(0, 1500) : 'No content'} 
         ---
       `).join('\n');
     }
@@ -160,7 +158,7 @@ export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
     // 2. Process Intelligence via Gemini
     const prompt = `
       Act as an automated intelligence analyst.
-      Analyze the following RAW WEB SEARCH DATA gathered from Firecrawl regarding security incidents in Nigeria.
+      Analyze the following RAW WEB SEARCH DATA gathered from Firecrawl regarding security incidents in Nigeria (last 48 hours).
 
       RAW DATA:
       ${aggregatedIntel}
@@ -174,7 +172,6 @@ export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
       1. **Media Extraction**: 
          - Look for 'videoUrl' (URLs pointing to X.com/Twitter, YouTube, Facebook videos).
          - Look for 'imageUrl' (URLs pointing to article main images, jpg/png evidence).
-         - Look for 'mediaUrls' (Any array of image/video evidence).
       2. **Geolocation**: Estimate the Lat/Lng based on the town/LGA mentioned.
       3. **Deduplication**: Do not create multiple entries for the same event found in different search results.
       4. **Dates**: Only include recent events (implied within last 7 days based on context).
@@ -193,8 +190,7 @@ export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
             "severity": "high" | "critical" | "medium",
             "sourceUrl": "URL of the article/page",
             "videoUrl": "URL of video evidence if found (otherwise null)",
-            "imageUrl": "URL of image evidence if found (otherwise null)",
-            "mediaUrls": ["url1", "url2"]
+            "imageUrl": "URL of image evidence if found (otherwise null)"
         }
       ]
     `;
@@ -232,8 +228,7 @@ export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
         timestamp: Date.now(), // Timestamp set to scan time
         sourceUrl: inc.sourceUrl,
         videoUrl: inc.videoUrl,
-        imageUrl: inc.imageUrl,
-        mediaUrls: inc.mediaUrls || []
+        imageUrl: inc.imageUrl
       }));
     } catch (parseError) {
       console.error("Failed to parse Gemini JSON:", text);
@@ -246,9 +241,12 @@ export const scanForThreats = async (): Promise<Partial<MapReport>[]> => {
   }
 };
 
+/**
+ * Uses LLM Intelligence to identify duplicate reports in the database.
+ */
 export const identifyDuplicates = async (reports: MapReport[]): Promise<string[]> => {
-    // (Existing duplicate logic preserved)
     if (reports.length < 2) return [];
+
     try {
         const simplifiedReports = reports.map(r => ({
             id: r.id,
@@ -258,6 +256,7 @@ export const identifyDuplicates = async (reports: MapReport[]): Promise<string[]
             date: new Date(r.timestamp).toISOString().split('T')[0],
             source: r.sourceUrl || ''
         }));
+
         const prompt = `
             You are a Data Deduplication Expert.
             Analyze this JSON list of security reports.
@@ -268,6 +267,7 @@ export const identifyDuplicates = async (reports: MapReport[]): Promise<string[]
             Input Data:
             ${JSON.stringify(simplifiedReports)}
         `;
+
         const response = await withRetry(async () => {
             return await ai.models.generateContent({
                 model: 'gemini-3-pro-preview',
@@ -279,11 +279,15 @@ export const identifyDuplicates = async (reports: MapReport[]): Promise<string[]
                 }
             });
         });
+
         const text = response.text || '{}';
         const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const result = JSON.parse(jsonString);
+
         return result.duplicateIds || [];
+
     } catch (error) {
+        console.error("AI Deduplication failed:", error);
         return [];
     }
 };
